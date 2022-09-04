@@ -9,7 +9,7 @@ const aws_lambda_zig_version = Version{ .major = 0, .minor = 0, .patch = 0 };
 pub fn getBuildPkg(b: *Builder) Pkg {
     return Pkg{
         .name = "aws",
-        .source = .{ .path = thisDir() ++ "/src/aws.zig" },
+        .source = .{ .path = getFullPath("/src/aws.zig") },
         .dependencies = b.allocator.dupe(Pkg, &[_]Pkg{getBuildOptionsPkg(b)}) catch null,
     };
 }
@@ -48,6 +48,10 @@ pub fn build(b: *std.build.Builder) void {
     }
 }
 
-fn thisDir() []const u8 {
-    return std.fs.path.dirname(@src().file) orelse ".";
+// from https://zig.news/xq/cool-zig-patterns-paths-in-build-scripts-4p59
+fn getFullPath(comptime path: [:0]const u8) [:0]const u8 {
+    return comptime blk: {
+        const this_dir = std.fs.path.dirname(@src().file) orelse ".";
+        break :blk this_dir ++ path;
+    };
 }

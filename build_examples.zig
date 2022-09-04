@@ -56,7 +56,7 @@ fn makeExample(b: *Builder, mode: Mode, target: CrossTarget, example_name: [:0]c
     example.setBuildMode(mode);
     example.addPackage(aws_pkg);
     example.linkLibC();
-    example.addIncludePath(thisDir() ++ "/deps/include/");
+    example.addIncludePath(getFullPath("/deps/include/"));
     addStaticLib(example, "libbrotlicommon.a");
     addStaticLib(example, "libbrotlidec.a");
     addStaticLib(example, "libcrypto.a");
@@ -75,11 +75,16 @@ fn thisDir() []const u8 {
     return std.fs.path.dirname(@src().file) orelse ".";
 }
 
+// from https://zig.news/xq/cool-zig-patterns-paths-in-build-scripts-4p59
+fn getFullPath(comptime path: [:0]const u8) [:0]const u8 {
+    return comptime thisDir() ++ path;
+}
+
 fn addStaticLib(libExeObjStep: *LibExeObjStep, staticLibName: [:0]const u8) void {
     if (libExeObjStep.target.cpu_arch.?.isAARCH64()) {
-        libExeObjStep.addObjectFile(allocPrint(libExeObjStep.builder.allocator, "{s}/deps/{s}/{s}", .{ thisDir(), "lib_aarch64", staticLibName }) catch unreachable);
+        libExeObjStep.addObjectFile(allocPrint(libExeObjStep.builder.allocator, "{s}/deps/{s}/{s}", .{ comptime thisDir(), "lib_aarch64", staticLibName }) catch unreachable);
     } else {
-        libExeObjStep.addObjectFile(allocPrint(libExeObjStep.builder.allocator, "{s}/deps/{s}/{s}", .{ thisDir(), "lib_x86_64", staticLibName }) catch unreachable);
+        libExeObjStep.addObjectFile(allocPrint(libExeObjStep.builder.allocator, "{s}/deps/{s}/{s}", .{ comptime thisDir(), "lib_x86_64", staticLibName }) catch unreachable);
     }
 }
 
@@ -90,19 +95,19 @@ fn dirExists(path: [:0]const u8) bool {
 }
 
 fn packageBinary(b: *Builder, package_name: []const u8) *RunStep {
-    if (!dirExists(thisDir() ++ "/runtime")) {
-        std.fs.makeDirAbsolute(thisDir() ++ "/runtime") catch unreachable;
+    if (!dirExists(getFullPath("/runtime"))) {
+        std.fs.makeDirAbsolute(getFullPath("/runtime")) catch unreachable;
     }
-    const package_path = allocPrint(b.allocator, "{s}/zig-out/bin/{s}", .{ thisDir(), package_name }) catch unreachable;
+    const package_path = allocPrint(b.allocator, "{s}/zig-out/bin/{s}", .{ comptime thisDir(), package_name }) catch unreachable;
     var run_pakager: *RunStep = undefined;
 
     if (builtin.os.tag != .windows) {
-        const packager_script = thisDir() ++ "/packaging/packager";
+        const packager_script = getFullPath("/packaging/packager");
         run_pakager = b.addSystemCommand(&[_][]const u8{ packager_script, package_path });
     } else {
-        const packager_script = thisDir() ++ "/packaging/packager.ps1";
+        const packager_script = getFullPath("/packaging/packager.ps1");
         run_pakager = b.addSystemCommand(&[_][]const u8{ "powershell", packager_script, package_path });
     }
-    run_pakager.cwd = thisDir() ++ "/runtime";
+    run_pakager.cwd = getFullPath("/runtime");
     return run_pakager;
 }
