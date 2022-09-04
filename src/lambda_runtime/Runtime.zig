@@ -189,7 +189,8 @@ fn getNext(self: *Runtime) !NextOutcome {
 
     if (curl_code != cURL.CURLE_OK) {
         self.logging.logDebug(LOG_TAG, "CURL returned error code {d} - {s}", .{ curl_code, cURL.curl_easy_strerror(curl_code) });
-        self.logging.logError(LOG_TAG, "Failed to get next invocation. No Response from endpoint", .{});
+        self.logging.logError(LOG_TAG, "Failed to get next invocation. No Response from endpoint \"{s}\"", .{self.endpoints[@enumToInt(EndPoints.NEXT)]});
+
         var nOutcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
         try self.next_outcomes.append(nOutcome);
         try self.responses.append(resp);
