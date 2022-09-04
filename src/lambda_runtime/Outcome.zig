@@ -148,7 +148,8 @@ test "Outcome <TResult, TFailure> - calling child destructor" {
     const SBoolOutcome = Outcome(S, bool, "destruct", "");
     var s = SBoolOutcome.init(.{S}, .{S{ .i = 1 }});
     try expect(s.isSuccess());
-    try expect(s.getResult().hello() == 1);
+    var result: S = s.getResult();
+    try expect(result.hello() == 1);
     s.deinit();
     try expect(!s.isSuccess()); // default value false when reinitialized.
     var f = SBoolOutcome.init(.{bool}, .{true});
