@@ -34,13 +34,13 @@ pub fn Outcome(comptime TResult: anytype, comptime TFailure: anytype, comptime T
         pub fn init(types: anytype, args: anytype) Self {
             // Only one arg either TResult, *TResult, TFailure, *TFailure, Outcome, *Outcome
             if ((types.len != args.len) or types.len > 1) {
-                @compileError("no matching constructor for initialization of " ++ @typeName(Self));
+                @compileError("no matching constructor for initialization of " ++ comptime @typeName(Self));
             }
             if (@typeInfo(@TypeOf(types)) != .Struct) {
-                @compileError("Expected tuple or struct argument, found " ++ @typeName(@TypeOf(types)));
+                @compileError("Expected tuple or struct argument, found " ++ comptime @typeName(@TypeOf(types)));
             }
             if (@typeInfo(@TypeOf(args)) != .Struct) {
-                @compileError("Expected tuple or struct argument, found " ++ @typeName(@TypeOf(args)));
+                @compileError("Expected tuple or struct argument, found " ++ comptime @typeName(@TypeOf(args)));
             }
 
             // only one arg in this case
@@ -84,7 +84,7 @@ pub fn Outcome(comptime TResult: anytype, comptime TFailure: anytype, comptime T
                 }
             }
 
-            @compileError("no matching constructor for initialization of " ++ @typeName(Self));
+            @compileError("no matching constructor for initialization of " ++ comptime @typeName(Self));
         }
 
         pub fn isSuccess(self: *Self) bool {

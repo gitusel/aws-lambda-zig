@@ -155,7 +155,7 @@ pub fn runHandler(self: *Runtime, handler: fn (InvocationRequest) anyerror!Invoc
 }
 
 fn configureRuntime(self: *Runtime, endpoint: [:0]const u8) !void {
-    try self.generateAndSaveUserAgent("AWS_Lambda_Zig/" ++ version.getVersion());
+    try self.generateAndSaveUserAgent("AWS_Lambda_Zig/" ++ comptime version.getVersion());
     try self.generateAndSaveEndPoints(endpoint);
     self.curl_handle = cURL.curl_easy_init() orelse {
         self.logging.logError(LOG_TAG, "Failed to acquire curl easy handle for next.", .{});
