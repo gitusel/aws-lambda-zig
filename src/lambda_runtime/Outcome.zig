@@ -68,7 +68,7 @@ pub fn Outcome(comptime TResult: anytype, comptime TFailure: anytype, comptime T
             }
 
             // passing Outcome struct - we must pass pointer
-            if (@typeName(*Self) == @typeName(arg_0_type)) { // if error pass the pointer as type
+            if (comptime std.mem.eql(u8, @typeName(*Self), @typeName(arg_0_type))) { // if error pass the pointer as type
 
                 // arg[0].* is Outcome
                 if (args[0].*.isSuccess()) {
