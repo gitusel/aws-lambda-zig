@@ -176,7 +176,7 @@ fn getNext(self: *Runtime) !NextOutcome {
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HEADERDATA, &resp);
 
     var headers: [*c]cURL.curl_slist = null;
-    headers = cURL.curl_slist_append(headers, &self.user_agent_header.?.ptr.*);
+    headers = cURL.curl_slist_append(headers, &self.user_agent_header.?.ptr[0]);
 
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HTTPHEADER, headers);
 
@@ -407,7 +407,7 @@ fn setCurlNextOptions(self: *Runtime) void {
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HTTP_VERSION, cURL.CURL_HTTP_VERSION_1_1);
 
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HTTPGET, @as(c_long, 1));
-    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_URL, &self.endpoints[@enumToInt(EndPoints.NEXT)].ptr.*);
+    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_URL, &self.endpoints[@enumToInt(EndPoints.NEXT)].ptr[0]);
 
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_WRITEFUNCTION, writeData);
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HEADERFUNCTION, writeHeader);
@@ -445,7 +445,7 @@ fn setCurlPostResultOptions(self: *Runtime) void {
 
 fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_response: *InvocationResponse) !PostOutcome {
     self.setCurlPostResultOptions();
-    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_URL, &url.ptr.*);
+    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_URL, &url.ptr[0]);
     self.logging.logInfo(LOG_TAG, "Making request to {s}", .{url});
 
     var headers: [*c]cURL.curl_slist = null;
@@ -460,12 +460,12 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     } else {
         const content_typeBuffer: [:0]const u8 = try allocPrintZ(self.allocator, "content-type: {s}", .{content_type.?});
         try self.strings.append(content_typeBuffer);
-        headers = cURL.curl_slist_append(headers, &content_typeBuffer.ptr.*);
+        headers = cURL.curl_slist_append(headers, &content_typeBuffer.ptr[0]);
     }
 
     headers = cURL.curl_slist_append(headers, "Expect:");
     headers = cURL.curl_slist_append(headers, "transfer-encoding:");
-    headers = cURL.curl_slist_append(headers, &self.user_agent_header.?.ptr.*);
+    headers = cURL.curl_slist_append(headers, &self.user_agent_header.?.ptr[0]);
 
     const payload: ?[:0]const u8 = handler_response.getPayload();
     if (payload == null) {
@@ -476,7 +476,7 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     self.logging.logDebug(LOG_TAG, "calculating content length... content-length: {d}", .{payload.?.len});
     const content_length: [:0]const u8 = try allocPrintZ(self.allocator, "content-length: {d}", .{payload.?.len});
     try self.strings.append(content_length);
-    headers = cURL.curl_slist_append(headers, &content_length.ptr.*);
+    headers = cURL.curl_slist_append(headers, &content_length.ptr[0]);
 
     var ctx: Pair = Pair{ .first = payload.?, .second = 0 };
     var resp: Response = try Response.init(self.allocator, self.logging);
