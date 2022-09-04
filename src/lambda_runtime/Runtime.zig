@@ -88,7 +88,7 @@ pub fn init(allocator: Allocator) Runtime {
     return self;
 }
 
-pub fn runHandler(self: *Runtime, handler: fn (InvocationRequest) anyerror!InvocationResponse) !void {
+pub fn runHandler(self: *Runtime, comptime handler: fn (InvocationRequest) anyerror!InvocationResponse) !void {
     self.logging.logInfo(LOG_TAG, "Initializing the Zig Lambda Runtime version {s}", .{version.getVersion()});
 
     var endpoint: [:0]const u8 = "http://";
