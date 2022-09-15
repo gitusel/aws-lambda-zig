@@ -350,7 +350,6 @@ fn writeData(ptr: [*c]u8, size: usize, nMemb: usize, user_data: ?*anyopaque) cal
     var resp: *Response = @ptrCast(*Response, @alignCast(@alignOf(Response), user_data.?));
     assert(size == 1);
 
-
     var typed_buffer: [*:0]u8 = @intToPtr([*:0]u8, @ptrToInt(ptr));
     resp.appendBody(typed_buffer[0..nMemb :0]) catch {
         return 0;
