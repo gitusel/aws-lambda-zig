@@ -1,6 +1,6 @@
 brotli-static-1.0.9-r6.apk
-curl-dev-7.83.1-r2.apk
-curl-static-7.83.1-r2.apk
+curl-dev-7.83.1-r3.apk
+curl-static-7.83.1-r3.apk
 nghttp2-static-1.47.0-r0.apk
 openssl-libs-static-1.1.1q-r0.apk
 zlib-static-1.2.12-r3.apk
