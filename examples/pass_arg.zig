@@ -18,7 +18,6 @@ fn myHandlerWithArg(ir: InvocationRequest, val: i32) !InvocationResponse {
 }
 
 pub fn myHandler(ir: InvocationRequest) !InvocationResponse {
-    _ = ir;
     // if arg in myHandlerWithArg needs alloc, it will need to be free before returning the response;
     return myHandlerWithArg(ir, 0);
 }
