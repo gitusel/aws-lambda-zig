@@ -454,11 +454,8 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     var headers: [*c]cURL.curl_slist = null;
 
     const content_type: ?[:0]const u8 = handler_response.getContentType();
-    if (content_type == null) {
-        return PostOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
-    }
 
-    if (content_type.?.len == 0) {
+    if ((content_type == null) or (content_type.?.len == 0)) {
         headers = cURL.curl_slist_append(headers, "content-type: text/html");
     } else {
         const content_typeBuffer: [:0]const u8 = try allocPrintZ(self.allocator, "content-type: {s}", .{content_type.?});
