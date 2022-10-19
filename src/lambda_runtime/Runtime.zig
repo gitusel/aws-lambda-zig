@@ -447,6 +447,8 @@ fn setCurlPostResultOptions(self: *Runtime) void {
 }
 
 fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_response: *InvocationResponse) !PostOutcome {
+    var local_strings: ArrayList([:0]const u8) = ArrayList([:0]const u8).init(self.allocator);
+
     self.setCurlPostResultOptions();
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_URL, &url.ptr[0]);
     self.logging.logInfo(LOG_TAG, "Making request to {s}", .{url});
@@ -459,7 +461,7 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
         headers = cURL.curl_slist_append(headers, "content-type: text/html");
     } else {
         const content_typeBuffer: [:0]const u8 = try allocPrintZ(self.allocator, "content-type: {s}", .{content_type.?});
-        try self.strings.append(content_typeBuffer);
+        try local_strings.append(content_typeBuffer);
         headers = cURL.curl_slist_append(headers, &content_typeBuffer.ptr[0]);
     }
 
@@ -476,7 +478,7 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     } else {
         self.logging.logDebug(LOG_TAG, "calculating content length... content-length: {d}", .{payload.?.len});
         const content_length: [:0]const u8 = try allocPrintZ(self.allocator, "content-length: {d}", .{payload.?.len});
-        try self.strings.append(content_length);
+        try local_strings.append(content_length);
         headers = cURL.curl_slist_append(headers, &content_length.ptr[0]);
         ctx = Pair{ .first = payload.?, .second = 0 };
     }
@@ -491,6 +493,12 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     var curl_code: cURL.CURLcode = cURL.curl_easy_perform(self.curl_handle.?); // perform call
     cURL.curl_slist_free_all(headers);
     try self.responses.append(resp);
+
+    // local strings memory cleanup
+    for (local_strings.items) |item| {
+        self.allocator.free(item);
+    }
+    local_strings.deinit();
 
     if (curl_code != cURL.CURLE_OK) {
         self.logging.logDebug(LOG_TAG, "CURL returned error code {d} - {s}, for invocation {s}", .{ curl_code, cURL.curl_easy_strerror(curl_code), request_id });
