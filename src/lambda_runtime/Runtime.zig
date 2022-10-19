@@ -43,6 +43,8 @@ const INIT_ERROR_ENDPOINT = "{s}/2018-06-01/runtime/init/error";
 const NEXT_ENDPOINT = "{s}/2018-06-01/runtime/invocation/next";
 const RESULT_ENDPOINT = "{s}/2018-06-01/runtime/invocation/";
 
+var post_url: [:0]const u8 = undefined;
+
 allocator: Allocator = undefined,
 strings: ArrayList([:0]const u8) = undefined,
 responses: ArrayList(Response) = undefined,
@@ -73,6 +75,12 @@ pub fn deinit(self: *Runtime) void {
     if (self.curl_handle) |curl_handle| cURL.curl_easy_cleanup(curl_handle);
 
     self.logging.deinit();
+
+    // remove post_url
+    if (post_url.len > 0) {
+        self.allocator.free(post_url);
+    }
+
     self.* = undefined;
 }
 
@@ -84,6 +92,7 @@ pub fn init(allocator: Allocator) Runtime {
         .responses = ArrayList(Response).init(allocator),
         .next_outcomes = ArrayList(NextOutcome).init(allocator),
     };
+    post_url = "";
     errdefer self.deinit();
     return self;
 }
@@ -268,18 +277,22 @@ fn getNext(self: *Runtime) !NextOutcome {
 // Tells lambda that the function has succeeded.
 //
 fn postSuccess(self: *Runtime, request_id: [:0]const u8, handler_response: *InvocationResponse) !PostOutcome {
-    const url: [:0]const u8 = try allocPrintZ(self.allocator, "{s}{s}/response", .{ self.endpoints[@enumToInt(EndPoints.RESULT)], request_id });
-    try self.strings.append(url);
-    return doPost(self, url, request_id, handler_response);
+    if (post_url.len > 0) {
+        self.allocator.free(post_url);
+    }
+    post_url = try allocPrintZ(self.allocator, "{s}{s}/response", .{ self.endpoints[@enumToInt(EndPoints.RESULT)], request_id });
+    return doPost(self, post_url, request_id, handler_response);
 }
 
 //
 // Tells lambda that the function has failed.
 //
 fn postFailure(self: *Runtime, request_id: [:0]const u8, handler_response: *InvocationResponse) !PostOutcome {
-    const url: [:0]const u8 = try allocPrintZ(self.allocator, "{s}{s}/error", .{ self.endpoints[@enumToInt(EndPoints.RESULT)], request_id });
-    try self.strings.append(url);
-    return doPost(self, url, request_id, handler_response);
+    if (post_url.len > 0) {
+        self.allocator.free(post_url);
+    }
+    post_url = try allocPrintZ(self.allocator, "{s}{s}/error", .{ self.endpoints[@enumToInt(EndPoints.RESULT)], request_id });
+    return doPost(self, post_url, request_id, handler_response);
 }
 
 fn handlePostOutcome(self: *Runtime, outcome: *PostOutcome, request_id: [:0]const u8) bool {
