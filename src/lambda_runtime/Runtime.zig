@@ -468,17 +468,19 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     headers = cURL.curl_slist_append(headers, &self.user_agent_header.?.ptr[0]);
 
     const payload: ?[:0]const u8 = handler_response.getPayload();
+    var ctx: Pair = undefined;
+
     if (payload == null) {
-        cURL.curl_slist_free_all(headers);
-        return PostOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
+        headers = cURL.curl_slist_append(headers, "content-length: 0");
+        ctx = Pair{ .first = null, .second = 0 };
+    } else {
+        self.logging.logDebug(LOG_TAG, "calculating content length... content-length: {d}", .{payload.?.len});
+        const content_length: [:0]const u8 = try allocPrintZ(self.allocator, "content-length: {d}", .{payload.?.len});
+        try self.strings.append(content_length);
+        headers = cURL.curl_slist_append(headers, &content_length.ptr[0]);
+        ctx = Pair{ .first = payload.?, .second = 0 };
     }
 
-    self.logging.logDebug(LOG_TAG, "calculating content length... content-length: {d}", .{payload.?.len});
-    const content_length: [:0]const u8 = try allocPrintZ(self.allocator, "content-length: {d}", .{payload.?.len});
-    try self.strings.append(content_length);
-    headers = cURL.curl_slist_append(headers, &content_length.ptr[0]);
-
-    var ctx: Pair = Pair{ .first = payload.?, .second = 0 };
     var resp: Response = try Response.init(self.allocator, self.logging);
 
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_WRITEDATA, &resp);
