@@ -313,6 +313,10 @@ fn readData(buffer: [*c]u8, size: usize, nItems: usize, user_data: ?*anyopaque) 
     const limit: usize = size * nItems;
     var ctx: *Pair = @ptrCast(*Pair, @alignCast(@alignOf(Pair), user_data.?));
 
+    if (ctx.first == null) {
+        return 0; // nothing to read
+    }
+
     var unread: usize = ctx.first.?.len - ctx.second;
     if (0 == unread) {
         return 0; // end of file/read
