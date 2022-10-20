@@ -213,7 +213,7 @@ fn getNext(self: *Runtime) !NextOutcome {
     }
 
     {
-        var content_type: [:0]const u8 = undefined;
+        var content_type: [:0]const u8 = "";
         _ = cURL.curl_easy_getinfo(self.curl_handle.?, cURL.CURLINFO_CONTENT_TYPE, &content_type);
         try resp.setContentType(content_type); // resp.getcontent_type not used after.
     }
