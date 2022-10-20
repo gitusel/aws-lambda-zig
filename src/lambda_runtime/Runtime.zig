@@ -45,22 +45,16 @@ const RESULT_ENDPOINT = "{s}/2018-06-01/runtime/invocation/";
 
 var post_url: [:0]const u8 = undefined;
 var next_outcome: ?NextOutcome = undefined;
+var response: ?Response = undefined;
 
 allocator: Allocator = undefined,
 strings: ArrayList([:0]const u8) = undefined,
-responses: ArrayList(Response) = undefined,
 logging: Logging = undefined,
 user_agent_header: ?[:0]const u8 = null,
 endpoints: [3][:0]const u8 = undefined,
 curl_handle: ?*cURL.CURL = null,
 
 pub fn deinit(self: *Runtime) void {
-    // remove responses
-    for (self.responses.items) |*item| {
-        item.deinit();
-    }
-    self.responses.deinit();
-
     // remove strings
     for (self.strings.items) |item| {
         self.allocator.free(item);
@@ -86,10 +80,10 @@ pub fn init(allocator: Allocator) Runtime {
         .allocator = allocator,
         .logging = Logging.init(allocator),
         .strings = ArrayList([:0]const u8).init(allocator),
-        .responses = ArrayList(Response).init(allocator),
     };
     post_url = "";
     next_outcome = null;
+    response = null;
     errdefer self.deinit();
     return self;
 }
@@ -153,6 +147,8 @@ pub fn runHandler(self: *Runtime, handler: *const fn (InvocationRequest) anyerro
             }
         }
         res.deinit();
+        response.?.deinit();
+        response = null;
     }
 
     if (retries == max_retries) {
@@ -180,12 +176,12 @@ fn deinitPreviousNextOutcome(outcome: *?NextOutcome) void {
 //
 fn getNext(self: *Runtime) !NextOutcome {
     // we can initialize response
-    var resp: Response = try Response.init(self.allocator, self.logging);
+    response = try Response.init(self.allocator, self.logging);
 
     self.setCurlNextOptions();
 
-    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_WRITEDATA, &resp);
-    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HEADERDATA, &resp);
+    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_WRITEDATA, &response);
+    _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HEADERDATA, &response);
 
     var headers: [*c]cURL.curl_slist = null;
     headers = cURL.curl_slist_append(headers, &self.user_agent_header.?.ptr[0]);
@@ -202,65 +198,67 @@ fn getNext(self: *Runtime) !NextOutcome {
     if (curl_code != cURL.CURLE_OK) {
         self.logging.logDebug(LOG_TAG, "CURL returned error code {d} - {s}", .{ curl_code, cURL.curl_easy_strerror(curl_code) });
         self.logging.logError(LOG_TAG, "Failed to get next invocation. No Response from endpoint \"{s}\"", .{self.endpoints[@enumToInt(EndPoints.NEXT)]});
-
-        try self.responses.append(resp);
         deinitPreviousNextOutcome(&next_outcome);
         next_outcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
+        response.?.deinit();
+        response = null;
         return next_outcome.?;
     }
 
     {
         var resp_code: c_long = 0;
         _ = cURL.curl_easy_getinfo(self.curl_handle.?, cURL.CURLINFO_RESPONSE_CODE, &resp_code);
-        resp.setResponseCode(@intToEnum(ResponseCode, resp_code));
+        response.?.setResponseCode(@intToEnum(ResponseCode, resp_code));
     }
 
     {
         var content_type: [:0]const u8 = "";
         _ = cURL.curl_easy_getinfo(self.curl_handle.?, cURL.CURLINFO_CONTENT_TYPE, &content_type);
-        try resp.setContentType(content_type); // resp.getcontent_type not used after.
+        try response.?.setContentType(content_type); // resp.getcontent_type not used after.
     }
 
-    if (!isSuccess(resp.getResponseCode())) {
-        self.logging.logError(LOG_TAG, "Failed to get next invocation. Http Response code: {d}", .{@enumToInt(resp.getResponseCode())});
-        try self.responses.append(resp);
+    if (!isSuccess(response.?.getResponseCode())) {
+        self.logging.logError(LOG_TAG, "Failed to get next invocation. Http Response code: {d}", .{@enumToInt(response.?.getResponseCode())});
         deinitPreviousNextOutcome(&next_outcome);
-        next_outcome = NextOutcome.init(.{ResponseCode}, .{resp.getResponseCode()});
+        next_outcome = NextOutcome.init(.{ResponseCode}, .{response.?.getResponseCode()});
+        response.?.deinit();
+        response = null;
         return next_outcome.?;
     }
 
-    var out: StringBoolOutcome = resp.getHeader(REQUEST_ID_HEADER);
+    var out: StringBoolOutcome = response.?.getHeader(REQUEST_ID_HEADER);
     if (!out.isSuccess()) {
         self.logging.logError(LOG_TAG, "Failed to find header {s} in response", .{REQUEST_ID_HEADER});
-        try self.responses.append(resp);
         deinitPreviousNextOutcome(&next_outcome);
         next_outcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
+        response.?.deinit();
+        response = null;
         return next_outcome.?;
     }
 
-    var req: InvocationRequest = InvocationRequest{ .payload = resp.getBody(), .request_id = out.getResult() };
+    var req: InvocationRequest = InvocationRequest{ .payload = response.?.getBody(), .request_id = out.getResult() };
 
-    out = resp.getHeader(TRACE_ID_HEADER);
+    out = response.?.getHeader(TRACE_ID_HEADER);
     if (out.isSuccess()) {
         req.xray_trace_id = out.getResult();
     }
 
-    out = resp.getHeader(CLIENT_CONTEXT_HEADER);
+    out = response.?.getHeader(CLIENT_CONTEXT_HEADER);
     if (out.isSuccess()) {
         req.client_context = out.getResult();
     }
 
-    out = resp.getHeader(COGNITO_IDENTITY_HEADER);
+    out = response.?.getHeader(COGNITO_IDENTITY_HEADER);
     if (out.isSuccess()) {
         req.cognito_identity = out.getResult();
     }
 
-    out = resp.getHeader(FUNCTION_ARN_HEADER);
+    out = response.?.getHeader(FUNCTION_ARN_HEADER);
     if (out.isSuccess()) {
         req.function_arn = out.getResult();
     }
 
-    out = resp.getHeader(DEADLINE_MS_HEADER);
+    out = response.?.getHeader(DEADLINE_MS_HEADER);
     if (out.isSuccess()) {
         const deadline_string = out.getResult();
         const ms = std.fmt.parseUnsigned(u64, deadline_string, 10) catch 0;
@@ -270,7 +268,6 @@ fn getNext(self: *Runtime) !NextOutcome {
         self.logging.logInfo(LOG_TAG, "Received payload: {s}\nTime remaining: {d}", .{ req.payload.?, req.getTimeRemaining() });
     }
 
-    try self.responses.append(resp);
     deinitPreviousNextOutcome(&next_outcome);
     next_outcome = NextOutcome.init(.{InvocationRequest}, .{req});
     return next_outcome.?;
