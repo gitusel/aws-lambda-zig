@@ -405,9 +405,8 @@ fn rtCurlDebugCallback(handle: *cURL.CURL, curl_infotype: cURL.curl_infotype, da
     _ = handle;
     _ = curl_infotype;
     var self: *Runtime = @ptrCast(*Runtime, @alignCast(@alignOf(Runtime), user_data.?));
-    var typed_data: [*:0]u8 = @intToPtr([*:0]u8, @ptrToInt(data));
 
-    self.logging.logDebug(LOG_TAG, "CURL DBG: {s}", .{typed_data[0..size :0]});
+    self.logging.logDebug(LOG_TAG, "CURL DBG: {s}", .{data[0..size]});
 
     return 0;
 }
