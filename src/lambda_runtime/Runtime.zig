@@ -359,20 +359,19 @@ fn readData(buffer: [*c]u8, size: usize, nItems: usize, user_data: ?*anyopaque) 
 }
 
 // writeData -> user_data is Response struct pointer
-fn writeData(ptr: [*c]u8, size: usize, nMemb: usize, user_data: ?*anyopaque) callconv(.C) usize {
-    if (ptr == null) {
+fn writeData(data: [*c]u8, size: usize, nMemb: usize, user_data: ?*anyopaque) callconv(.C) usize {
+    if (data == null) {
         return 0;
     }
 
     var resp: *Response = @ptrCast(*Response, @alignCast(@alignOf(Response), user_data.?));
     assert(size == 1);
 
-    var typed_buffer: [*:0]u8 = @intToPtr([*:0]u8, @ptrToInt(ptr));
-    resp.appendBody(typed_buffer[0..nMemb :0]) catch {
+    resp.appendBody(data[0..nMemb]) catch {
         return 0;
     };
 
-    return nMemb;
+    return size * nMemb;
 }
 
 // writeHeader called header by header when a header is fully loaded

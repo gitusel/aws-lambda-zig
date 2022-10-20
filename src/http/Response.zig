@@ -75,8 +75,8 @@ pub fn getBody(self: *const Response) ?[:0]const u8 {
     return self.body;
 }
 
-pub fn appendBody(self: *Response, text: [:0]const u8) !void {
-    const body: [:0]u8 = try std.mem.concatWithSentinel(self.allocator, u8, &[_][:0]const u8{ self.body, text }, 0);
+pub fn appendBody(self: *Response, text: []const u8) !void {
+    const body: [:0]u8 = try std.mem.concatWithSentinel(self.allocator, u8, &[_][]const u8{ self.body, text }, 0);
     self.allocator.free(self.body);
     self.body = body;
 }
