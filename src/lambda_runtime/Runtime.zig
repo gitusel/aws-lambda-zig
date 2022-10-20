@@ -322,7 +322,7 @@ fn generateAndSaveEndPoints(self: *Runtime, endpoint: [:0]const u8) !void {
 }
 
 // readData -> user_data is ctx Pair struct
-fn readData(buffer: [*c]u8, size: usize, nItems: usize, user_data: ?*anyopaque) callconv(.C) usize {
+fn readData(data: [*c]u8, size: usize, nItems: usize, user_data: ?*anyopaque) callconv(.C) usize {
     const limit: usize = size * nItems;
     var ctx: *Pair = @ptrCast(*Pair, @alignCast(@alignOf(Pair), user_data.?));
 
@@ -335,13 +335,11 @@ fn readData(buffer: [*c]u8, size: usize, nItems: usize, user_data: ?*anyopaque) 
         return 0; // end of file/read
     }
 
-    var typed_buffer: [*:0]u8 = @intToPtr([*:0]u8, @ptrToInt(buffer));
-
     if (unread <= limit) {
         var i: usize = 0 + ctx.second;
         var j: usize = 0;
         while (j < unread) : (j += 1) {
-            typed_buffer[j] = ctx.first.?[i];
+            data[j] = ctx.first.?[i];
             i += 1;
         }
         ctx.second += unread;
@@ -351,7 +349,7 @@ fn readData(buffer: [*c]u8, size: usize, nItems: usize, user_data: ?*anyopaque) 
     var i: usize = 0 + ctx.second;
     var j: usize = 0;
     while (j < limit) : (j += 1) {
-        typed_buffer[j] = ctx.first.?[i];
+        data[j] = ctx.first.?[i];
         i += 1;
     }
     ctx.second += limit;
