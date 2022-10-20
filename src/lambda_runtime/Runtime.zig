@@ -44,6 +44,7 @@ const NEXT_ENDPOINT = "{s}/2018-06-01/runtime/invocation/next";
 const RESULT_ENDPOINT = "{s}/2018-06-01/runtime/invocation/";
 
 var post_url: [:0]const u8 = undefined;
+var next_outcome: ?NextOutcome = undefined;
 
 allocator: Allocator = undefined,
 strings: ArrayList([:0]const u8) = undefined,
@@ -52,7 +53,6 @@ logging: Logging = undefined,
 user_agent_header: ?[:0]const u8 = null,
 endpoints: [3][:0]const u8 = undefined,
 curl_handle: ?*cURL.CURL = null,
-next_outcomes: ArrayList(NextOutcome) = undefined,
 
 pub fn deinit(self: *Runtime) void {
     // remove responses
@@ -60,12 +60,6 @@ pub fn deinit(self: *Runtime) void {
         item.deinit();
     }
     self.responses.deinit();
-
-    // remove next_outcomes
-    for (self.next_outcomes.items) |*item| {
-        item.deinit();
-    }
-    self.next_outcomes.deinit();
 
     // remove strings
     for (self.strings.items) |item| {
@@ -81,6 +75,9 @@ pub fn deinit(self: *Runtime) void {
         self.allocator.free(post_url);
     }
 
+    // deinit last next_outcome
+    deinitPreviousNextOutcome(&next_outcome);
+
     self.* = undefined;
 }
 
@@ -90,9 +87,9 @@ pub fn init(allocator: Allocator) Runtime {
         .logging = Logging.init(allocator),
         .strings = ArrayList([:0]const u8).init(allocator),
         .responses = ArrayList(Response).init(allocator),
-        .next_outcomes = ArrayList(NextOutcome).init(allocator),
     };
     post_url = "";
+    next_outcome = null;
     errdefer self.deinit();
     return self;
 }
@@ -124,33 +121,33 @@ pub fn runHandler(self: *Runtime, handler: *const fn (InvocationRequest) anyerro
     const max_retries: usize = 3;
 
     while (retries < max_retries) {
-        var next_outcome = try self.getNext();
-        if (!next_outcome.isSuccess()) {
-            if (next_outcome.getFailure() == ResponseCode.REQUEST_NOT_MADE) {
+        var outcome = try self.getNext();
+        if (!outcome.isSuccess()) {
+            if (outcome.getFailure() == ResponseCode.REQUEST_NOT_MADE) {
                 retries += 1;
                 continue;
             }
-            self.logging.logInfo(LOG_TAG, "HTTP request was not successful. HTTP response code: {d}. Retrying...", .{@enumToInt(next_outcome.getFailure())});
+            self.logging.logInfo(LOG_TAG, "HTTP request was not successful. HTTP response code: {d}. Retrying...", .{@enumToInt(outcome.getFailure())});
             retries += 1;
             continue;
         }
 
         retries = 0; // infinite loop
 
-        const req: InvocationRequest = next_outcome.getResult();
+        const req: InvocationRequest = outcome.getResult();
         self.logging.logInfo(LOG_TAG, "Invoking user handler", .{});
         var res: InvocationResponse = try handler(req);
         self.logging.logInfo(LOG_TAG, "Invoking user handler completed.", .{});
 
         if (res.isSuccess()) {
-            var postOutcome: PostOutcome = try self.postSuccess(req.request_id.?, &res);
-            if (!self.handlePostOutcome(&postOutcome, req.request_id.?)) {
+            var post_outcome: PostOutcome = try self.postSuccess(req.request_id.?, &res);
+            if (!self.handlePostOutcome(&post_outcome, req.request_id.?)) {
                 res.deinit();
                 return; // TODO: implement a better retry strategy
             }
         } else {
-            var postOutcome: PostOutcome = try self.postFailure(req.request_id.?, &res);
-            if (!self.handlePostOutcome(&postOutcome, req.request_id.?)) {
+            var post_outcome: PostOutcome = try self.postFailure(req.request_id.?, &res);
+            if (!self.handlePostOutcome(&post_outcome, req.request_id.?)) {
                 res.deinit();
                 return; // TODO: implement a better retry strategy
             }
@@ -170,6 +167,12 @@ fn configureRuntime(self: *Runtime, endpoint: [:0]const u8) !void {
         self.logging.logError(LOG_TAG, "Failed to acquire curl easy handle for next.", .{});
         return error.CURLHandleInitFailed;
     };
+}
+
+fn deinitPreviousNextOutcome(outcome: *?NextOutcome) void {
+    if (outcome.*) |*o| {
+        o.deinit();
+    }
 }
 
 //
@@ -200,10 +203,10 @@ fn getNext(self: *Runtime) !NextOutcome {
         self.logging.logDebug(LOG_TAG, "CURL returned error code {d} - {s}", .{ curl_code, cURL.curl_easy_strerror(curl_code) });
         self.logging.logError(LOG_TAG, "Failed to get next invocation. No Response from endpoint \"{s}\"", .{self.endpoints[@enumToInt(EndPoints.NEXT)]});
 
-        var nOutcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
-        try self.next_outcomes.append(nOutcome);
         try self.responses.append(resp);
-        return nOutcome;
+        deinitPreviousNextOutcome(&next_outcome);
+        next_outcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
+        return next_outcome.?;
     }
 
     {
@@ -220,19 +223,19 @@ fn getNext(self: *Runtime) !NextOutcome {
 
     if (!isSuccess(resp.getResponseCode())) {
         self.logging.logError(LOG_TAG, "Failed to get next invocation. Http Response code: {d}", .{@enumToInt(resp.getResponseCode())});
-        var nOutcome: NextOutcome = NextOutcome.init(.{ResponseCode}, .{resp.getResponseCode()});
-        try self.next_outcomes.append(nOutcome);
         try self.responses.append(resp);
-        return nOutcome;
+        deinitPreviousNextOutcome(&next_outcome);
+        next_outcome = NextOutcome.init(.{ResponseCode}, .{resp.getResponseCode()});
+        return next_outcome.?;
     }
 
     var out: StringBoolOutcome = resp.getHeader(REQUEST_ID_HEADER);
     if (!out.isSuccess()) {
         self.logging.logError(LOG_TAG, "Failed to find header {s} in response", .{REQUEST_ID_HEADER});
-        var nOutcome: NextOutcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
-        try self.next_outcomes.append(nOutcome);
         try self.responses.append(resp);
-        return nOutcome;
+        deinitPreviousNextOutcome(&next_outcome);
+        next_outcome = NextOutcome.init(.{ResponseCode}, .{ResponseCode.REQUEST_NOT_MADE});
+        return next_outcome.?;
     }
 
     var req: InvocationRequest = InvocationRequest{ .payload = resp.getBody(), .request_id = out.getResult() };
@@ -267,10 +270,10 @@ fn getNext(self: *Runtime) !NextOutcome {
         self.logging.logInfo(LOG_TAG, "Received payload: {s}\nTime remaining: {d}", .{ req.payload.?, req.getTimeRemaining() });
     }
 
-    var next_outcome: NextOutcome = NextOutcome.init(.{InvocationRequest}, .{req});
-    try self.next_outcomes.append(next_outcome);
     try self.responses.append(resp);
-    return next_outcome;
+    deinitPreviousNextOutcome(&next_outcome);
+    next_outcome = NextOutcome.init(.{InvocationRequest}, .{req});
+    return next_outcome.?;
 }
 
 //
@@ -650,6 +653,17 @@ test "Runtime runHandler" {
     try expect(rh == {});
     rh = try r.runHandler(testFailureHandler1); // if AWS_LAMBDA_RUNTIME_API is fully configured, it will call the server
     try expect(rh == {});
+}
+
+test "Runtime deinitPreviousNextOutcome" {
+    const expect = std.testing.expect;
+    var o: ?NextOutcome = null;
+    deinitPreviousNextOutcome(&o);
+    try expect(o == null);
+    o = NextOutcome.init(.{InvocationRequest}, .{InvocationRequest{}});
+    try expect(o.?.isSuccess());
+    deinitPreviousNextOutcome(&o);
+    try expect(!o.?.isSuccess());
 }
 
 fn testSuccessHandler1(ir: InvocationRequest) !InvocationResponse {
