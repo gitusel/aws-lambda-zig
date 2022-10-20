@@ -504,7 +504,7 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     }
 
     var resp: Response = try Response.init(self.allocator, self.logging);
-
+    defer resp.deinit();
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_WRITEDATA, &resp);
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_HEADERDATA, &resp);
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_READDATA, &ctx);
@@ -512,7 +512,6 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
 
     var curl_code: cURL.CURLcode = cURL.curl_easy_perform(self.curl_handle.?); // perform call
     cURL.curl_slist_free_all(headers);
-    try self.responses.append(resp);
 
     if (curl_code != cURL.CURLE_OK) {
         self.logging.logDebug(LOG_TAG, "CURL returned error code {d} - {s}, for invocation {s}", .{ curl_code, cURL.curl_easy_strerror(curl_code), request_id });
