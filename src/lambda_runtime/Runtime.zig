@@ -377,21 +377,22 @@ fn writeData(ptr: [*c]u8, size: usize, nMemb: usize, user_data: ?*anyopaque) cal
 
 // writeHeader called header by header when a header is fully loaded
 // writeHeader -> user_data is Response struct pointer
-fn writeHeader(ptr: [*c]u8, size: usize, nMemb: usize, user_data: ?*anyopaque) callconv(.C) usize {
-    if (ptr == null) {
+fn writeHeader(data: [*c]u8, size: usize, nMemb: usize, user_data: ?*anyopaque) callconv(.C) usize {
+    if (data == null) {
         return 0;
     }
 
     var resp: *Response = @ptrCast(*Response, @alignCast(@alignOf(Response), user_data.?));
-    var typed_buffer: [*:0]u8 = @intToPtr([*:0]u8, @ptrToInt(ptr));
-    resp.logging.logDebug(LOG_TAG, "received header: {s}", .{typed_buffer[0..nMemb :0]});
+    assert(size == 1);
+
+    resp.logging.logDebug(LOG_TAG, "received header: {s}", .{data[0..nMemb]});
 
     var i: usize = 0;
     while (i < nMemb) : (i += 1) {
-        if (ptr[i] != ':') {
+        if (data[i] != ':') {
             continue;
         }
-        resp.addHeader(trim(typed_buffer[0..i]), trim(typed_buffer[(i + 1)..nMemb])) catch {
+        resp.addHeader(trim(data[0..i]), trim(data[(i + 1)..nMemb])) catch {
             return 0;
         };
         break;
