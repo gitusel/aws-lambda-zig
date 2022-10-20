@@ -458,6 +458,13 @@ fn setCurlPostResultOptions(self: *Runtime) void {
 
 fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_response: *InvocationResponse) !PostOutcome {
     var local_strings: ArrayList([:0]const u8) = ArrayList([:0]const u8).init(self.allocator);
+    defer {
+        // local strings memory cleanup
+        for (local_strings.items) |item| {
+            self.allocator.free(item);
+        }
+        local_strings.deinit();
+    }
 
     self.setCurlPostResultOptions();
     _ = cURL.curl_easy_setopt(self.curl_handle.?, cURL.CURLOPT_URL, &url.ptr[0]);
@@ -503,12 +510,6 @@ fn doPost(self: *Runtime, url: [:0]const u8, request_id: [:0]const u8, handler_r
     var curl_code: cURL.CURLcode = cURL.curl_easy_perform(self.curl_handle.?); // perform call
     cURL.curl_slist_free_all(headers);
     try self.responses.append(resp);
-
-    // local strings memory cleanup
-    for (local_strings.items) |item| {
-        self.allocator.free(item);
-    }
-    local_strings.deinit();
 
     if (curl_code != cURL.CURLE_OK) {
         self.logging.logDebug(LOG_TAG, "CURL returned error code {d} - {s}, for invocation {s}", .{ curl_code, cURL.curl_easy_strerror(curl_code), request_id });
