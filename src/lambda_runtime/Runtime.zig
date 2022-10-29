@@ -163,6 +163,7 @@ fn configureRuntime(self: *Runtime, endpoint: [:0]const u8) !void {
         self.logging.logError(LOG_TAG, "Failed to acquire curl easy handle for next.", .{});
         return error.CURLHandleInitFailed;
     };
+    _ = cURL.curl_easy_setopt(self.curl_handle, cURL.CURLOPT_CAINFO, "/etc/pki/tls/certs/ca-bundle.crt");
 }
 
 fn deinitPreviousNextOutcome(outcome: *?NextOutcome) void {
