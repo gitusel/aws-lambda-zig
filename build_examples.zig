@@ -12,7 +12,7 @@ pub fn build(b: *Builder) void {
     const mode = b.standardReleaseOptions();
     const target = b.standardTargetOptions(.{});
     if (target.cpu_arch != null) {
-        var examples: []*LibExeObjStep = &.{
+        var examples: []*LibExeObjStep = &[_]*LibExeObjStep{
             makeExample(b, mode, target, "hello_world", "examples/hello_world.zig"),
             makeExample(b, mode, target, "echo_bin", "examples/echo_bin.zig"),
             makeExample(b, mode, target, "echo_failure", "examples/echo_failure.zig"),
