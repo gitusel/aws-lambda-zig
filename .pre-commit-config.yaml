@@ -11,6 +11,8 @@ repos:
           - --fix=lf
     -   id: check-yaml
     -   id: detect-aws-credentials
+        args:
+          - --allow-missing-credentials
 -   repo: local
     hooks:
     -   id: zigformat
