@@ -102,17 +102,18 @@ fn dirExists(path: [:0]const u8) bool {
 
 fn packageBinary(b: *Builder, package_name: []const u8) *RunStep {
     if (!dirExists(getPath("/runtime"))) {
-        std.fs.makeDirAbsolute(getPath("/runtime")) catch unreachable;
+        std.fs.cwd().makeDir(getPath("/runtime")) catch unreachable;
     }
-    const package_path = allocPrint(b.allocator, "{s}/zig-out/bin/{s}", .{ thisDir(), package_name }) catch unreachable;
+    const package_path = allocPrint(b.allocator, "../zig-out/bin/{s}", .{package_name}) catch unreachable;
     var run_pakager: *RunStep = undefined;
 
     if (builtin.os.tag != .windows) {
-        const packager_script = getPath("/packaging/packager");
+        const packager_script = "../packaging/packager";
         run_pakager = b.addSystemCommand(&[_][]const u8{ packager_script, package_path });
     } else {
-        const packager_script = getPath("/packaging/packager.ps1");
+        const packager_script = "../packaging/packager.ps1";
         run_pakager = b.addSystemCommand(&[_][]const u8{ "powershell", packager_script, package_path });
     }
+    run_pakager.cwd = getPath("/runtime");
     return run_pakager;
 }
