@@ -16,10 +16,18 @@ pub fn Outcome(comptime TResult: anytype, comptime TFailure: anytype, comptime T
         fn destructor(self: *Self) void {
             switch (self.res) {
                 ResultTag.s => if (TResultDeinit.len > 0) {
-                    @call(.{}, @field(self.res.s, TResultDeinit), .{});
+                    if (@hasDecl(std.builtin, "CallModifier")) {
+                        @call(.auto, @field(self.res.s, TResultDeinit), .{});
+                    } else {
+                        @call(.{}, @field(self.res.s, TResultDeinit), .{});
+                    }
                 },
                 ResultTag.f => if (TFailureDeinit.len > 0) {
-                    @call(.{}, @field(self.res.f, TFailureDeinit), .{});
+                    if (@hasDecl(std.builtin, "CallModifier")) {
+                        @call(.auto, @field(self.res.f, TFailureDeinit), .{});
+                    } else {
+                        @call(.{}, @field(self.res.f, TFailureDeinit), .{});
+                    }
                 },
             }
         }
@@ -136,7 +144,7 @@ test "Outcome <TResult, TFailure> - calling child destructor" {
         i: i32 = 0,
         const Self = @This();
         fn destruct(self: *Self) void {
-            // self is a mandatory arg due to @call
+            // self is a mandatory arg due to @call using @field
             self.i = -1;
             self.* = undefined;
         }
