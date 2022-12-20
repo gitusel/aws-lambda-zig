@@ -16,7 +16,6 @@ pub fn init(allocator: Allocator) Kvs {
         .store = HashMap.init(allocator),
         .strings = ArrayList([:0]const u8).init(allocator),
     };
-    errdefer self.deinit();
     return self;
 }
 

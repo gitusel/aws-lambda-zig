@@ -16,7 +16,6 @@ pub fn init(allocator: Allocator) Logging {
     const self = Logging{
         .allocator = allocator,
     };
-    errdefer self.deinit();
     return self;
 }
 

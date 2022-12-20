@@ -84,7 +84,6 @@ pub fn init(allocator: Allocator) Runtime {
     post_url = "";
     next_outcome = null;
     response = null;
-    errdefer self.deinit();
     return self;
 }
 
