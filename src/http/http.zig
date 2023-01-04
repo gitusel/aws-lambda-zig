@@ -1,1 +1,1 @@
-pub const ResponseCode = @import("../http/ResponseCode.zig").ResponseCode;
+pub const ResponseCode = @import("ResponseCode.zig").ResponseCode;
