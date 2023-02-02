@@ -1,12 +1,12 @@
 const std = @import("std");
-const Builder = std.build.Builder;
+const Build = if (@hasDecl(std, "Build")) std.Build else std.build.Builder;
 const Pkg = std.build.Pkg;
 const Version = std.builtin.Version;
 const Os = std.Target.Os;
-
+const CompileStep = if (@hasDecl(Build, "standardOptimizeOption")) std.build.CompileStep else std.build.LibExeObjStep;
 const aws_lambda_zig_version = Version{ .major = 0, .minor = 0, .patch = 0 };
 
-pub fn getBuildPkg(b: *Builder) Pkg {
+pub fn getBuildPkg(b: *Build) Pkg {
     return Pkg{
         .name = "aws",
         .source = .{ .path = getFullPath("/src/aws.zig") },
@@ -14,21 +14,30 @@ pub fn getBuildPkg(b: *Builder) Pkg {
     };
 }
 
-fn getBuildOptionsPkg(b: *Builder) Pkg {
+fn getBuildOptionsPkg(b: *Build) Pkg {
     const build_options_step = std.build.OptionsStep.create(b);
     build_options_step.addOption(Version, "aws_lambda_zig_version", aws_lambda_zig_version);
     return build_options_step.getPackage("build_options");
 }
 
-pub fn build(b: *std.build.Builder) void {
-    // Standard release options allow the person running `zig build` to select
+pub fn build(b: *Build) void {
+    // Standard optimize options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
     const target = b.standardTargetOptions(.{});
 
-    const lib_tests = b.addTest("src/aws.zig");
-    lib_tests.setBuildMode(mode);
-    lib_tests.setTarget(target);
+    var lib_tests: *CompileStep = undefined;
+    if (@hasDecl(Build, "standardOptimizeOption")) {
+        lib_tests = b.addTest(.{
+            .root_source_file = .{ .path = "src/aws.zig" },
+            .target = target,
+            .optimize = b.standardOptimizeOption(.{}),
+        });
+    } else {
+        lib_tests = b.addTest("src/aws.zig");
+        lib_tests.setBuildMode(b.standardReleaseOptions());
+        lib_tests.setTarget(target);
+    }
+
     lib_tests.linkLibC();
     lib_tests.linkSystemLibrary("curl");
     lib_tests.addPackage(getBuildOptionsPkg(b));

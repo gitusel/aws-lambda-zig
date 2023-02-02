@@ -1,22 +1,21 @@
 const std = @import("std");
-const Builder = std.build.Builder;
-const LibExeObjStep = std.build.LibExeObjStep;
+const Build = if (@hasDecl(std, "Build")) std.Build else std.build.Builder;
+const OptimizeMode = if (@hasDecl(Build, "standardOptimizeOption")) std.builtin.OptimizeMode else std.builtin.Mode;
+const CompileStep = if (@hasDecl(Build, "standardOptimizeOption")) std.build.CompileStep else std.build.LibExeObjStep;
 const RunStep = std.build.RunStep;
-const Step = std.build.Step;
-const Mode = std.builtin.Mode;
 const allocPrint = std.fmt.allocPrint;
 const CrossTarget = std.zig.CrossTarget;
 const builtin = @import("builtin");
 
-pub fn build(b: *Builder) void {
-    const mode = b.standardReleaseOptions();
+pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
+    const optimize = if (@hasDecl(Build, "standardOptimizeOption")) b.standardOptimizeOption(.{}) else b.standardReleaseOptions();
     if (target.cpu_arch != null) {
-        var examples: []*LibExeObjStep = &[_]*LibExeObjStep{
-            makeExample(b, mode, target, "hello_world", "examples/hello_world.zig"),
-            makeExample(b, mode, target, "echo_bin", "examples/echo_bin.zig"),
-            makeExample(b, mode, target, "echo_failure", "examples/echo_failure.zig"),
-            makeExample(b, mode, target, "pass_arg", "examples/pass_arg.zig"),
+        var examples: []*CompileStep = &[_]*CompileStep{
+            makeExample(b, optimize, target, "hello_world", "examples/hello_world.zig"),
+            makeExample(b, optimize, target, "echo_bin", "examples/echo_bin.zig"),
+            makeExample(b, optimize, target, "echo_failure", "examples/echo_failure.zig"),
+            makeExample(b, optimize, target, "pass_arg", "examples/pass_arg.zig"),
         };
         for (examples) |example| {
             example.install();
@@ -25,35 +24,61 @@ pub fn build(b: *Builder) void {
             b.default_step.dependOn(&pack_example.step);
         }
     } else {
-        makeLocalExample(b, mode, target, "hello_world", "examples/hello_world.zig");
-        makeLocalExample(b, mode, target, "echo_bin", "examples/echo_bin.zig");
-        makeLocalExample(b, mode, target, "echo_failure", "examples/echo_failure.zig");
-        makeLocalExample(b, mode, target, "pass_arg", "examples/pass_arg.zig");
+        makeLocalExample(b, optimize, target, "hello_world", "examples/hello_world.zig");
+        makeLocalExample(b, optimize, target, "echo_bin", "examples/echo_bin.zig");
+        makeLocalExample(b, optimize, target, "echo_failure", "examples/echo_failure.zig");
+        makeLocalExample(b, optimize, target, "pass_arg", "examples/pass_arg.zig");
     }
 }
 
-fn makeLocalExample(b: *Builder, mode: Mode, target: CrossTarget, example_name: [:0]const u8, example_path: [:0]const u8) void {
+fn makeLocalExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, example_name: [:0]const u8, example_path: [:0]const u8) void {
     // adding aws_lambda_runtime
     const aws_pkg = @import("build.zig").getBuildPkg(b);
     defer b.allocator.free(aws_pkg.dependencies.?);
 
-    const example = b.addExecutable(example_name, example_path);
-    example.setTarget(target);
-    example.setBuildMode(mode);
+    var example: *CompileStep = undefined;
+    if (@hasDecl(Build, "standardOptimizeOption")) {
+        example = b.addExecutable(.{
+            .name = example_name,
+            .root_source_file = .{ .path = example_path },
+            .optimize = optimize,
+            .target = target,
+        });
+    } else {
+        example = b.addExecutable(example_name, example_path);
+        example.setBuildMode(b.standardReleaseOptions());
+        example.setTarget(target);
+    }
+
     example.addPackage(aws_pkg);
     example.linkLibC();
     example.linkSystemLibrary("curl");
     example.install();
 }
 
-fn makeExample(b: *Builder, mode: Mode, target: CrossTarget, example_name: [:0]const u8, example_path: [:0]const u8) *LibExeObjStep {
+fn makeExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, example_name: [:0]const u8, example_path: [:0]const u8) *CompileStep {
     // adding aws_lambda_runtime
     const aws_pkg = @import("build.zig").getBuildPkg(b);
     defer b.allocator.free(aws_pkg.dependencies.?);
 
-    const example = b.addExecutable(example_name, example_path);
-    example.setTarget(target);
-    example.setBuildMode(mode);
+    var example: *CompileStep = undefined;
+
+    if (@hasDecl(Build, "standardOptimizeOption")) {
+        example = b.addExecutable(.{
+            .name = example_name,
+            .root_source_file = .{ .path = example_path },
+            .optimize = optimize,
+            .target = target,
+        });
+        if (optimize == .ReleaseSmall) {
+            example.strip = true;
+        }
+    } else {
+        example = b.addExecutable(example_name, example_path);
+        example.setBuildMode(b.standardReleaseOptions());
+        example.setTarget(target);
+    }
+
     example.addPackage(aws_pkg);
     example.linkLibC();
     example.addIncludePath(getPath("/deps/include/"));
@@ -65,9 +90,6 @@ fn makeExample(b: *Builder, mode: Mode, target: CrossTarget, example_name: [:0]c
     addStaticLib(example, "libnghttp2.a");
     addStaticLib(example, "libcurl.a");
 
-    if (mode == .ReleaseSmall) {
-        example.strip = true;
-    }
     return example;
 }
 
@@ -86,11 +108,11 @@ fn getPath(comptime path: [:0]const u8) [:0]const u8 {
     };
 }
 
-fn addStaticLib(libExeObjStep: *LibExeObjStep, staticLibName: [:0]const u8) void {
-    if (libExeObjStep.target.cpu_arch.?.isAARCH64()) {
-        libExeObjStep.addObjectFile(allocPrint(libExeObjStep.builder.allocator, "{s}/deps/{s}/{s}", .{ thisDir(), "lib_aarch64", staticLibName }) catch unreachable);
+fn addStaticLib(compileStep: *CompileStep, staticLibName: [:0]const u8) void {
+    if (compileStep.target.cpu_arch.?.isAARCH64()) {
+        compileStep.addObjectFile(allocPrint(compileStep.builder.allocator, "{s}/deps/{s}/{s}", .{ thisDir(), "lib_aarch64", staticLibName }) catch unreachable);
     } else {
-        libExeObjStep.addObjectFile(allocPrint(libExeObjStep.builder.allocator, "{s}/deps/{s}/{s}", .{ thisDir(), "lib_x86_64", staticLibName }) catch unreachable);
+        compileStep.addObjectFile(allocPrint(compileStep.builder.allocator, "{s}/deps/{s}/{s}", .{ thisDir(), "lib_x86_64", staticLibName }) catch unreachable);
     }
 }
 
@@ -100,7 +122,7 @@ fn dirExists(path: [:0]const u8) bool {
     return true;
 }
 
-fn packageBinary(b: *Builder, package_name: []const u8) *RunStep {
+fn packageBinary(b: *Build, package_name: []const u8) *RunStep {
     if (!dirExists(getPath("/runtime"))) {
         std.fs.cwd().makeDir(getPath("/runtime")) catch unreachable;
     }

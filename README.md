@@ -6,8 +6,20 @@ The libraries are extracted from Alpine Linux v3.16. For aarch64, Alpine Linux's
 
 ## x86_64
 
+Before zig commit #efa25e7:
+
 zig build --build-file ./build_examples.zig -Dtarget=x86_64-linux-musl -Drelease-small=true
+
+After zig commit #efa25e7:
+
+zig build --build-file ./build_examples.zig -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSmall
 
 ## ARM64
 
+Before zig commit #efa25e7:
+
 zig build --build-file ./build_examples.zig -Dtarget=aarch64-linux-musl -Drelease-small=true
+
+After zig commit #efa25e7:
+
+zig build --build-file ./build_examples.zig -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSmall
