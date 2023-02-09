@@ -1,23 +1,32 @@
 const std = @import("std");
 const Build = if (@hasDecl(std, "Build")) std.Build else std.build.Builder;
-const Pkg = std.build.Pkg;
+const Module = if (@hasDecl(std, "Build")) std.Build.Module else std.build.Pkg;
 const Version = std.builtin.Version;
 const Os = std.Target.Os;
-const CompileStep = if (@hasDecl(Build, "standardOptimizeOption")) std.build.CompileStep else std.build.LibExeObjStep;
+const CompileStep = if (@hasDecl(Build, "standardOptimizeOption")) Build.CompileStep else std.build.LibExeObjStep;
 const aws_lambda_zig_version = Version{ .major = 0, .minor = 0, .patch = 0 };
 
-pub fn getBuildPkg(b: *Build) Pkg {
-    return Pkg{
-        .name = "aws",
-        .source = .{ .path = getFullPath("/src/aws.zig") },
-        .dependencies = b.allocator.dupe(Pkg, &[_]Pkg{getBuildOptionsPkg(b)}) catch null,
-    };
+pub fn getBuildModule(b: *Build) if (@hasDecl(std, "Build")) *Module else Module {
+    if (@hasDecl(std, "Build")) {
+        return b.createModule(.{
+            .source_file = .{ .path = getFullPath("/src/aws.zig") },
+            .dependencies = &.{
+                .{ .name = "build_options", .module = getBuildOptionsModule(b) },
+            },
+        });
+    } else {
+        return Module{
+            .name = "aws",
+            .source = .{ .path = getFullPath("/src/aws.zig") },
+            .dependencies = b.allocator.dupe(Module, &[1]Module{getBuildOptionsModule(b)}) catch null,
+        };
+    }
 }
 
-fn getBuildOptionsPkg(b: *Build) Pkg {
-    const build_options_step = std.build.OptionsStep.create(b);
+fn getBuildOptionsModule(b: *Build) if (@hasDecl(std, "Build")) *Module else Module {
+    const build_options_step = if (@hasDecl(std, "Build")) Build.OptionsStep.create(b) else std.build.OptionsStep.create(b);
     build_options_step.addOption(Version, "aws_lambda_zig_version", aws_lambda_zig_version);
-    return build_options_step.getPackage("build_options");
+    return if (@hasDecl(std, "Build")) build_options_step.createModule() else build_options_step.getPackage("build_options");
 }
 
 pub fn build(b: *Build) void {
@@ -32,15 +41,16 @@ pub fn build(b: *Build) void {
             .target = target,
             .optimize = b.standardOptimizeOption(.{}),
         });
+        lib_tests.addModule("build_options", getBuildOptionsModule(b));
     } else {
         lib_tests = b.addTest("src/aws.zig");
         lib_tests.setBuildMode(b.standardReleaseOptions());
         lib_tests.setTarget(target);
+        lib_tests.addPackage(getBuildOptionsModule(b));
     }
 
     lib_tests.linkLibC();
     lib_tests.linkSystemLibrary("curl");
-    lib_tests.addPackage(getBuildOptionsPkg(b));
 
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&lib_tests.step);

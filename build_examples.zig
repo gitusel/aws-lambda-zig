@@ -33,8 +33,10 @@ pub fn build(b: *Build) void {
 
 fn makeLocalExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, example_name: [:0]const u8, example_path: [:0]const u8) void {
     // adding aws_lambda_runtime
-    const aws_pkg = @import("build.zig").getBuildPkg(b);
-    defer b.allocator.free(aws_pkg.dependencies.?);
+    const aws_module = @import("build.zig").getBuildModule(b);
+    defer if (!@hasDecl(std, "Build")) {
+        b.allocator.free(aws_module.dependencies.?);
+    };
 
     var example: *CompileStep = undefined;
     if (@hasDecl(Build, "standardOptimizeOption")) {
@@ -44,13 +46,13 @@ fn makeLocalExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, exam
             .optimize = optimize,
             .target = target,
         });
+        example.addModule("aws", aws_module);
     } else {
         example = b.addExecutable(example_name, example_path);
         example.setBuildMode(b.standardReleaseOptions());
         example.setTarget(target);
+        example.addPackage(aws_module);
     }
-
-    example.addPackage(aws_pkg);
     example.linkLibC();
     example.linkSystemLibrary("curl");
     example.install();
@@ -58,8 +60,10 @@ fn makeLocalExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, exam
 
 fn makeExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, example_name: [:0]const u8, example_path: [:0]const u8) *CompileStep {
     // adding aws_lambda_runtime
-    const aws_pkg = @import("build.zig").getBuildPkg(b);
-    defer b.allocator.free(aws_pkg.dependencies.?);
+    const aws_module = @import("build.zig").getBuildModule(b);
+    defer if (!@hasDecl(std, "Build")) {
+        b.allocator.free(aws_module.dependencies.?);
+    };
 
     var example: *CompileStep = undefined;
 
@@ -70,6 +74,7 @@ fn makeExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, example_n
             .optimize = optimize,
             .target = target,
         });
+        example.addModule("aws", aws_module);
         if (optimize == .ReleaseSmall) {
             example.strip = true;
         }
@@ -77,9 +82,9 @@ fn makeExample(b: *Build, optimize: OptimizeMode, target: CrossTarget, example_n
         example = b.addExecutable(example_name, example_path);
         example.setBuildMode(b.standardReleaseOptions());
         example.setTarget(target);
+        example.addPackage(aws_module);
     }
 
-    example.addPackage(aws_pkg);
     example.linkLibC();
     example.addIncludePath(getPath("/deps/include/"));
     addStaticLib(example, "libbrotlicommon.a");
