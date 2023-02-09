@@ -117,10 +117,8 @@ fn jsonEscape(allocator: Allocator, text: [:0]const u8) ![:0]const u8 {
     }
 
     const out: [:0]u8 = try allocator.allocSentinel(u8, out_size, 0);
-    var i: usize = 0;
     var j: usize = 0;
-    while (i < text.len) : (i += 1) {
-        const char = text[i];
+    for (text) |char| {
         if ((char > last_non_printable_character) and (char != '\"') and (char != '\\')) {
             out[j] = char;
             j += 1;
