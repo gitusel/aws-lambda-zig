@@ -61,7 +61,11 @@ pub fn contains(self: *Kvs, key: [:0]const u8) bool {
 
 fn toLowerCase(self: *Kvs, st: [:0]const u8) ![:0]const u8 {
     const result: [:0]u8 = try self.allocator.allocSentinel(u8, st.len, 0); // []T - pointer to runtime-known number of items so const is possible
-    for (st) |c, i| result[i] = std.ascii.toLower(c);
+    var i: usize = 0;
+    const st_len: usize = st.len;
+    while (i < st_len) : (i += 1) {
+        result[i] = std.ascii.toLower(st[i]);
+    }
     return result;
 }
 

@@ -14,9 +14,14 @@ const allocator = gpa.allocator();
 fn binaryResponse(ir: InvocationRequest) !InvocationResponse {
     _ = ir;
     var png: [AWSLOGO_PNG_LEN + 1]u8 = [_]u8{0} ** (AWSLOGO_PNG_LEN + 1);
-    for (awslogoPng) |c, i| png[i] = c;
+    var i: usize = 0;
+    const awslogoPng_len: usize = awslogoPng.len;
+    while (i < awslogoPng_len) : (i += 1) {
+        png[i] = awslogoPng[i];
+    }
     return try InvocationResponse.success(allocator, png[0..AWSLOGO_PNG_LEN :0], "image/png");
 }
+
 pub fn main() !void {
     defer _ = gpa.deinit();
     var runtime = Runtime.init(allocator);
