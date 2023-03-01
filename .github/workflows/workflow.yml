@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    
+    - uses: actions/checkout@v3
+
     - name: Update Dependencies
       run: sudo apt-get update -y
 
@@ -20,21 +20,21 @@ jobs:
       run: sudo apt-get install -y libcurl4-openssl-dev
 
     - name: Install Zig
-      uses: goto-bus-stop/setup-zig@v1.3.0
+      uses: goto-bus-stop/setup-zig@v2
       with:
         version: master
 
     - name: Run tests
       run: AWS_LAMBDA_RUNTIME_API="" zig build test
-      
+
   format:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Install Zig
-      uses: goto-bus-stop/setup-zig@v1.3.0
+      uses: goto-bus-stop/setup-zig@v2
       with:
         version: master
 
