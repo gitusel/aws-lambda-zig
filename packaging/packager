@@ -16,33 +16,34 @@
 set -euo pipefail
 
 print_help() {
-    echo -e "Usage: packager <binary name>\n"
+  echo -e "Usage: packager <binary name>\n"
 }
 
 if [ $# -lt 1 ]; then
-    echo -e "Error: missing arguments\n"
-    print_help
-    exit 1
+  echo -e "Error: missing arguments\n"
+  print_help
+  exit 1
 fi
 
 PKG_BIN_PATH=$1
 
 if [ ! -f "$PKG_BIN_PATH" ]; then
-    echo "$PKG_BIN_PATH" - No such file.;
-    exit 1;
+  echo "$PKG_BIN_PATH" - No such file.
+  exit 1
 fi
 
-if ! type zip > /dev/null 2>&1; then
-    echo "zip utility is not found. Please install it and re-run this script"
-    exit 1
+if ! type zip >/dev/null 2>&1; then
+  echo "zip utility is not found. Please install it and re-run this script"
+  exit 1
 fi
 
-PKG_DIR=tmp
 PKG_BIN_FILENAME=$(basename "$PKG_BIN_PATH")
+PKG_DIR="tmp_$PKG_BIN_FILENAME"
 
 mkdir -p "$PKG_DIR/bin"
 
-bootstrap_script=$(cat <<EOF
+bootstrap_script=$(
+cat <<EOF
 #!/bin/bash
 set -euo pipefail
 export AWS_EXECUTION_ENV=lambda-zig
@@ -52,16 +53,15 @@ EOF
 
 cp "$PKG_BIN_PATH" "$PKG_DIR/bin"
 
-echo -e "$bootstrap_script" > "$PKG_DIR/bootstrap"
+echo -e "$bootstrap_script" >"$PKG_DIR/bootstrap"
 
 chmod +x "$PKG_DIR/bootstrap"
 
 # some shenanigans to create the right layout in the zip file without extraneous directories
-pushd "$PKG_DIR" > /dev/null
-zip --symlinks --recurse-paths "$PKG_BIN_FILENAME".zip -- *
+pushd "$PKG_DIR" >/dev/null
+zip -q --symlinks --recurse-paths "$PKG_BIN_FILENAME".zip -- *
 ORIGIN_DIR=$(dirs -l +1)
 mv "$PKG_BIN_FILENAME".zip "$ORIGIN_DIR"
-popd > /dev/null
+popd >/dev/null
 rm -r "$PKG_DIR"
 echo Created "$ORIGIN_DIR/$PKG_BIN_FILENAME".zip
-
