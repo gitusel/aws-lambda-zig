@@ -44,12 +44,12 @@ pub fn log(self: *Logging, comptime level: Level, comptime tag: [:0]const u8, co
     }
 
     const args_text: [:0]const u8 = std.fmt.allocPrintZ(self.allocator, fmt, args) catch {
-        std.io.getStdOut().writer().print("error occurred during log formatting!\n", .{}) catch unreachable;
+        std.io.getStdErr().writer().print("error occurred during log formatting!\n", .{}) catch unreachable;
         return;
     };
     defer self.allocator.free(args_text);
 
-    const writer = std.io.getStdOut().writer();
+    const writer = std.io.getStdErr().writer();
     var buffered_writer = bufferedWriter(writer);
     var stdout_writer = buffered_writer.writer();
 
