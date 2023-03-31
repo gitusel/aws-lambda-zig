@@ -53,7 +53,12 @@ pub fn build(b: *Build) void {
     lib_tests.linkSystemLibrary("curl");
 
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&lib_tests.step);
+
+    if (@hasDecl(Build, "addRunArtifact")) {
+        test_step.dependOn(&b.addRunArtifact(lib_tests).step);
+    } else {
+        test_step.dependOn(&lib_tests.step);
+    }
 
     // from https://zig.news/squeek502/code-coverage-for-zig-1dk1
     const coverage = b.option(bool, "test-coverage", "Generate test coverage") orelse false;
