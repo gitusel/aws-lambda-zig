@@ -18,10 +18,12 @@ const StringBoolOutcome = Outcome([:0]const u8, bool, "", "");
 const NextOutcome = Outcome(InvocationRequest, ResponseCode, "", "");
 const PostOutcome = Outcome(NoResult, ResponseCode, "", "");
 
+// zls: off
 const cURL = @cImport({
     @cInclude("curl/curl.h");
     @cInclude("curl/curlver.h");
 });
+// zls: on
 
 const LOG_TAG: [:0]const u8 = "LAMBDA_RUNTIME";
 const REQUEST_ID_HEADER: [:0]const u8 = "lambda-runtime-aws-request-id";
