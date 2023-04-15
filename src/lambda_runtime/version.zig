@@ -14,7 +14,11 @@ pub fn getVersionPatch() u32 {
 }
 
 pub fn getVersion() [:0]const u8 {
-    return std.fmt.comptimePrint("\"{d}.{d}.{d}\"", .{ aws_lambda_zig_version.major, aws_lambda_zig_version.minor, aws_lambda_zig_version.patch });
+    const version: [:0]const u8 = comptime blk: {
+        const version = std.fmt.comptimePrint("\"{d}.{d}.{d}\"", .{ aws_lambda_zig_version.major, aws_lambda_zig_version.minor, aws_lambda_zig_version.patch });
+        break :blk version;
+    };
+    return version;
 }
 
 test "version getVersion" {
